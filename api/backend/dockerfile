@@ -1,0 +1,20 @@
+# Use Python 3.10 alpine image
+FROM python:3.10-alpine
+
+# Set the working directory to /backend
+WORKDIR /
+
+# Copy the contents of the current directory (backend folder) into /backend in the container
+COPY . /backend
+
+# Install dependencies from requirements.txt
+RUN pip install -r /backend/requirements.txt  # Fix the path to /backend/requirements.txt
+
+# Set the Python path so that the backend module can be found
+ENV PYTHONPATH=/backend
+
+# Expose port (adjust if necessary)
+EXPOSE 9998
+
+# Run the application
+CMD ["python", "-m", "backend.run"]
