@@ -1,5 +1,5 @@
 from flask import Blueprint, Flask, jsonify, request
-from backend.app import db
+from backend.app import MYSQLdb
 from backend.models.userModels import User
 import bcrypt
 from datetime import datetime, timedelta
@@ -123,8 +123,8 @@ def register():
 
     # Save user to the database
     new_user = User(username=username, email=email, passwd=hashed_password.decode('utf-8'))
-    db.session.add(new_user)
-    db.session.commit()
+    MYSQLdb.session.add(new_user)
+    MYSQLdb.session.commit()
 
     return jsonify({'message': 'User registered successfully'}), 200
 

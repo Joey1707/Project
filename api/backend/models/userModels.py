@@ -1,18 +1,18 @@
-from backend.app import db
+from backend.app import MYSQLdb
 from werkzeug.security import generate_password_hash
 import datetime
 
 INDTimeDelta = datetime.timedelta(hours=7)
 INDTZOObject = datetime.timezone(INDTimeDelta,
                                  name = "IND")
-class User(db.Model):
+class User(MYSQLdb.Model):
     __tablename__ = 'userData'  # Table name should match the actual table in your database
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # Ensure correct primary key
-    username = db.Column(db.String(50), nullable=True, unique = True)  # Matching column name and type
-    passwd = db.Column(db.String(512), nullable=True)  # Matching column name and type
-    email = db.Column(db.String(50), nullable=True, unique = True)
-    date = db.Column(db.DateTime, default = datetime.datetime.now, nullable = True)
+    id = MYSQLdb.Column(MYSQLdb.Integer, primary_key=True, autoincrement=True)  # Ensure correct primary key
+    username = MYSQLdb.Column(MYSQLdb.String(50), nullable=True, unique = True)  # Matching column name and type
+    passwd = MYSQLdb.Column(MYSQLdb.String(512), nullable=True)  # Matching column name and type
+    email = MYSQLdb.Column(MYSQLdb.String(50), nullable=True, unique = True)
+    date = MYSQLdb.Column(MYSQLdb.DateTime, default = datetime.datetime.now, nullable = True)
 
     def __repr__(self):
         return f"<User {self.username}>"
