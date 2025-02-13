@@ -11,10 +11,6 @@ load_dotenv()
 MYSQLdb = SQLAlchemy()
 migrate = Migrate()
 
-# mongo_client = MongoClient(ConfigMongo)
-# mongo_db = mongo_client["ProjectData"]
-# user_collection = mongo_db["Data"]
-
 def create_app():
     app = Flask(__name__)
     app.config.from_object(ConfigMYSQL)
