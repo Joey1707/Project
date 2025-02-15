@@ -1,82 +1,87 @@
-from flask import Blueprint, Flask, jsonify, request, Response
+from flask import Blueprint, Flask, jsonify, Response, request
 from backend.app import MYSQLdb
 from backend.config import ConfigMongo
-import datetime
-from functools import wraps
-import jwt as pyjwt
 from backend.models.userModels import User
 import os
 from dotenv import load_dotenv
-from backend.services import fetch_and_process_data
+from backend.services import fetch_and_process_data, token_required, input_data
 
-# from bson.objectid import ObjectId
 
-# client = ConfigMongo.get_client()
-# db = client["Project"]  # Select database
-# collection = db["UserData"]  # Select collection  # Ensure this points to the correct DB
+app = Flask(__name__)
+client = ConfigMongo.get_client()
+db = client["Project"]  
 
 load_dotenv()
 data = Blueprint('dataRoute', __name__)
-app = Flask(__name__)
-
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 
-def token_required(func):
-    @wraps(func)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')  # Get the token from the Authorization header
-        if not token:
-            return jsonify({'alert': 'Token is missing'}), 401
+#reading collection
+@data.route("/userData", methods=["POST"])
+@token_required
+def get_data(id):
+    MYSQLUser = User.query.filter_by(id=id).first()
+    collection = db["User", MYSQLUser.id]  
+    df = fetch_and_process_data()
 
-        try:
-            token = token.split(" ")[1]
-            payload = pyjwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            email = payload.get('email')  # Accessing email from the payload
+    print("Database name:", db.name)  
+    print("Collection name:", collection.name)  
+     
+    if df is None:
+        return jsonify({"error": "No data found in MongoDB collection."}), 404  # Use 404 for "Not Found"
+    return jsonify(df.to_dict(orient="records")), 200
 
-        except pyjwt.ExpiredSignatureError:
-            return jsonify({'alert': 'Token expired'}), 401
-        except pyjwt.InvalidTokenError:
-            return jsonify({'alert': 'Invalid token'}), 401
+#inputing data to a collection
+@data.route ("/inputingData", methods = ["POST"])
+@token_required
+def inputing_data(email):
+    try:
+        MYSQLUser = User.query.filter_by(email=email).first()
+        if not MYSQLUser:
+            return jsonify({"error":"user not found"}), 404
 
-        # You can now use the email to authenticate or authorize the user
-        print(f"Authenticated user Email: {email}")
+        collection = db["user_data"]  
+        user_data = request.get_json()
+        if not user_data:
+            return jsonify({"error": "no data provided"}), 400
+        Response = input_data(collection, user_data, MYSQLUser)
+        return Response
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"error": "Internal server error"}), 500
 
-        return func(email=email,*args, **kwargs)
 
-    return decorated
-
-# @data.route('/mongoUser', methods=['POST'])
-# @token_required
-# def create_or_update_user(email):
-#     MYSQLUser = User.query.filter_by(email=email).first()
+@data.route('/testingDataBase_Updating', methods=['POST'])
+@token_required
+def create_or_update_user(id):
+    MYSQLUser = User.query.filter_by(id=id).first()
     
-#     try:
-#         # User data to insert or update
-#         user_data = {
-#             'name': 'adam', 
-#             'lastname': 'smith', 
-#             'MYSQL_ID': MYSQLUser.id
-#         }
+    try:
+        # User data to insert or update
+        user_data = {
+            'name': 'adam', 
+            'lastname': 'smith', 
+            'MYSQL_ID': MYSQLUser.id
+        }
 
-#         # Update if exists, otherwise insert
-#         db_response = collection.update_one(
-#             {"MYSQL_ID": MYSQLUser.id},  # Search filter
-#             {"$set": user_data},         # Data to set/update
-#             upsert=True                  # Insert if no match found
-#         )
+        # Update if exists, otherwise insert
+        db_response = collection.update_one(
+            {"MYSQL_ID": MYSQLUser.id},  # Search filter
+            {"$set": user_data},         # Data to set/update
+            upsert=True                  # Insert if no match found
+        )
         
-#         return jsonify({
-#             "message": "User created or updated",
-#             "mimetype": "application/json",
-#             "mySQL_ID": MYSQLUser.id,
-#             "matched_count": db_response.matched_count,
-#             "modified_count": db_response.modified_count
-#         }), 200
+        return jsonify({
+            "message": "User created or updated",
+            "mimetype": "application/json",
+            "mySQL_ID": MYSQLUser.id,
+            "matched_count": db_response.matched_count,
+            "modified_count": db_response.modified_count
+        }), 200
 
-#     except Exception as ex:
-#         return jsonify({"error": str(ex)})
+    except Exception as ex:
+        return jsonify({"error": str(ex)})
     
-@data.route("/insertingUser", methods=["POST"])
+@data.route("/testingDataBase_InsertingUser", methods=["POST"])
 def insert_user():
  
     try:
@@ -116,28 +121,5 @@ def get_some_users():
         print("Error fetching users:", ex)
         return jsonify({"error": str(ex)}), 500
 
-@data.route("/userData", methods=["GET"])
-def get_data():
 
-    df = fetch_and_process_data()
-    if df is None:
-        return jsonify({"error": "No data found in MongoDB collection."}), 404  # Use 404 for "Not Found"
-    return jsonify(df.to_dict(orient="records")), 200
 
-# @data.route("/userData", methods=["GET"])
-# def get_data():
-#     client = ConfigMongo.get_client()
-#     db = client["Project"]  # Select database
-#     collection = db["newUser"]  # Select collection  # Ensure this points to the correct DB
-#     try:
-#     # Print the number of documents in the collection
-#     # count = collection.count_documents({})
-#     # print(f"Number of documents in collection: {count}")
-
-#     # Fetch the first few documents
-#         data = list(collection.find({}, {"_id": 0}).limit(1))
-#         return jsonify({"data": data}), 200
- 
-#     except Exception as ex:
-#         print(f"Error: {ex}")
-#         return jsonify({"error": str(ex)}), 500

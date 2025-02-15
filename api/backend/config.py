@@ -16,5 +16,5 @@ class ConfigMongo:
     @staticmethod
     def get_client():
         if ConfigMongo._mongo_client is None:
-            ConfigMongo._mongo_client = MongoClient(os.getenv("MONGODB_DATABASE_URL"), serverSelectionTimeoutMS=2000)
+            ConfigMongo._mongo_client = MongoClient(os.getenv("MONGODB_DATABASE_URL"), serverSelectionTimeoutMS=10000)
         return ConfigMongo._mongo_client["ProjectData"]  # Return the database instance

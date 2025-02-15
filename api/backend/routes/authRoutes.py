@@ -8,6 +8,7 @@ from functools import wraps
 import datetime
 from dotenv import load_dotenv
 import os
+from backend.services import token_required
 
 load_dotenv()
 
@@ -20,30 +21,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 
 # JWT Token Decorator
-def token_required(func):
-    @wraps(func)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')  # Get the token from the Authorization header
-        if not token:
-            return jsonify({'alert': 'Token is missing'}), 401
-
-        try:
-            token = token.split(" ")[1]
-            payload = pyjwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            email = payload.get('email')  # Accessing email from the payload
-
-        except pyjwt.ExpiredSignatureError:
-            return jsonify({'alert': 'Token expired'}), 401
-        except pyjwt.InvalidTokenError:
-            return jsonify({'alert': 'Invalid token'}), 401
-
-        # You can now use the email to authenticate or authorize the user
-        print(f"Authenticated user Email: {email}")
-
-        return func(email=email,*args, **kwargs)
-
-    return decorated
-
 
 @auth.route('/verify-token', methods=['POST'])
 @token_required
@@ -65,8 +42,8 @@ def verify_token(email): #email is received from token_required decorator functi
 
 @auth.route('/dashboard', methods=['POST'])
 @token_required
-def dashboard(email):
-    user = User.query.filter_by(email=email).first()
+def dashboard(id):
+    user = User.query.filter_by(id=id).first()
 
     if not user:
         return jsonify({'error': 'User not found'}), 404
@@ -76,8 +53,6 @@ def dashboard(email):
         'username': user.username,
         'email': user.email
     }), 200
-
-
 
 @auth.route('/login', methods=['POST'])
 def login():
@@ -95,7 +70,7 @@ def login():
 
     stored_hashed_password = user.passwd
     if bcrypt.checkpw(passwd.encode('utf-8'), stored_hashed_password.encode('utf-8')):
-        expiration = datetime.datetime.now() + timedelta(minutes=60)
+        expiration = datetime.datetime.now() + timedelta()
         token = pyjwt.encode({
             'email': email, 
             'exp': expiration}, app.config['SECRET_KEY'], algorithm="HS256")
