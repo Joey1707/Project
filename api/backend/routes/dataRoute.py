@@ -4,8 +4,8 @@ from backend.config import ConfigMongo
 from backend.models.userModels import User
 import os
 from dotenv import load_dotenv
-from backend.services import fetch_and_process_data, token_required, input_data
-
+from backend.services import fetch_and_process_data, token_required, input_data, checking_correct_filetype
+import pandas as pd
 
 app = Flask(__name__)
 client = ConfigMongo.get_client()
@@ -31,20 +31,53 @@ def get_data(id):
     return jsonify(df.to_dict(orient="records")), 200
 
 #inputing data to a collection
-@data.route ("/inputingData", methods = ["POST"])
+@data.route("/inputingData", methods=["POST"])
 @token_required
 def inputing_data(email):
     try:
         MYSQLUser = User.query.filter_by(email=email).first()
         if not MYSQLUser:
-            return jsonify({"error":"user not found"}), 404
+            return jsonify({"error": "user not found"}), 404
 
-        collection = db["user_data"]  
-        user_data = request.get_json()
-        if not user_data:
-            return jsonify({"error": "no data provided"}), 400
-        Response = input_data(collection, user_data, MYSQLUser)
-        return Response
+        # Ensure a file is provided
+        if "file" not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+
+        file = request.files["file"]
+
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+        
+        # Check file extension
+        ALLOWED_EXTENSIONS = {"csv", "xlsx"}
+        file_extension = file.filename.rsplit(".", 1)[1].lower()
+
+        if file_extension not in ALLOWED_EXTENSIONS:
+            return jsonify({"error": "Invalid file format. Only CSV and Excel are allowed"}), 400
+
+        # Read the file
+        if file_extension == "csv":
+            df = pd.read_csv(file)
+        elif file_extension == "xlsx":
+            df = pd.read_excel(file)
+
+        # Convert DataFrame to list of dictionaries
+        user_data_list = df.to_dict(orient="records")
+
+        # Attach MYSQL user ID to each record
+        for user_data in user_data_list:
+            user_data["MYSQL_ID"] = MYSQLUser.id
+
+        collection = db["user_data"]
+
+        # Insert data into MongoDB
+        db_response = collection.insert_many(user_data_list)
+
+        return jsonify({
+            "message": "Data imported successfully",
+            "inserted_ids": [str(id) for id in db_response.inserted_ids]
+        }), 200
+
     except Exception as e:
         print("Error:", e)
         return jsonify({"error": "Internal server error"}), 500

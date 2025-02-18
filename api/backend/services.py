@@ -52,7 +52,17 @@ def input_data(collection, user_data, MYSQLUser):
     except Exception as e:
         print ("error:", e)
         return jsonify({"error when inputing data, please try again"}), 500
+    
+ALLOWED_EXTENSIONS = {"csv", "xlsx"}
 
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def checking_correct_filetype (filename):
+    if allowed_file(filename):
+        return filename.rsplit (".", 1 )[1].lower()
+    return None
+    
 def token_required(func):
     @wraps(func)
     def decorated(*args, **kwargs):

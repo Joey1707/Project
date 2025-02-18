@@ -70,7 +70,7 @@ def login():
 
     stored_hashed_password = user.passwd
     if bcrypt.checkpw(passwd.encode('utf-8'), stored_hashed_password.encode('utf-8')):
-        expiration = datetime.datetime.now() + timedelta()
+        expiration = datetime.datetime.now() + timedelta(hours=100)
         token = pyjwt.encode({
             'email': email, 
             'exp': expiration}, app.config['SECRET_KEY'], algorithm="HS256")
