@@ -2,9 +2,6 @@ from backend.app import MYSQLdb
 from werkzeug.security import generate_password_hash
 import datetime
 
-INDTimeDelta = datetime.timedelta(hours=7)
-INDTZOObject = datetime.timezone(INDTimeDelta,
-                                 name = "IND")
 class User(MYSQLdb.Model):
     __tablename__ = 'userData'  # Table name should match the actual table in your database
 
@@ -13,6 +10,7 @@ class User(MYSQLdb.Model):
     passwd = MYSQLdb.Column(MYSQLdb.String(512), nullable=True)  # Matching column name and type
     email = MYSQLdb.Column(MYSQLdb.String(50), nullable=True, unique = True)
     date = MYSQLdb.Column(MYSQLdb.DateTime, default = datetime.datetime.now, nullable = True)
+    number_of_data = MYSQLdb.Column(MYSQLdb.INT, default = 0)
 
     def __repr__(self):
         return f"<User {self.username}>"

@@ -13,9 +13,10 @@ app = Flask(__name__)
 # Secret Key for JWT
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 
+# reading data
 def fetch_and_process_data(collection):
     try:
-        data = list(collection.find({}, {"_id": 0}).limit(1))
+        data = list(collection.find({}, {"_id": 0}))
 
         if not data:  
             print("No data found in MongoDB collection.")  
@@ -33,35 +34,6 @@ def fetch_and_process_data(collection):
         df["Date"] = pd.to_datetime(df["Date"])
 
     return df
-
-def input_data(collection, user_data, MYSQLUser):
-    try:
-        if not user_data:
-            return jsonify({"there's no data that can be inputed"}),400
-
-        user_data["MYSQL_ID"] = MYSQLUser.id
-        db_response = collection.insert_one(user_data)
-
-        print(db_response.inserted_id)
-
-        return jsonify({
-            "message": "data imported succesfully", 
-            "id" : str(db_response.inserted_id)
-        }), 200
-    
-    except Exception as e:
-        print ("error:", e)
-        return jsonify({"error when inputing data, please try again"}), 500
-    
-ALLOWED_EXTENSIONS = {"csv", "xlsx"}
-
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def checking_correct_filetype (filename):
-    if allowed_file(filename):
-        return filename.rsplit (".", 1 )[1].lower()
-    return None
     
 def token_required(func):
     @wraps(func)
@@ -81,7 +53,7 @@ def token_required(func):
             return jsonify({'alert': 'Invalid token'}), 401
 
         # You can now use the email to authenticate or authorize the user
-        print(f"Authenticated user ID: {email}")
+        print(f"Authenticated user email: {email}")
 
         return func(email=email,*args, **kwargs)
 
