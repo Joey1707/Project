@@ -18,38 +18,85 @@ data = Blueprint('dataRoute', __name__)
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 
 #reading collection
+from datetime import datetime
+from flask import request, jsonify
+from bson import ObjectId
+import pandas as pd
+
 @data.route("/userData", methods=["GET"])
 @token_required
 def get_data(email):
+    # Fetch the user from MySQL
     MYSQLUser = User.query.filter_by(email=email).first()
-    collection = db["user_data"]  
-
-    upload_count = request.args.get("upload_count")
-    if not upload_count:
-        return({"error": "upload_count parameter is required"}), 400
-    
-    try:
-        upload_count = int(upload_count)
-    except ValueError:
-        return jsonify({"error": "upload_count must be an interget"}), 400
-    
-    filter = {"MYSQL_ID": MYSQLUser.id, "upload_count":upload_count}
-
     if not MYSQLUser:
         return jsonify({"error": "user not found"}), 404
 
-    results = list(collection.find(filter, {"_id": 0}).limit(10))
+    # Access the MongoDB collection
+    collection = db["user_data"]
 
-    if not results:
-        return jsonify ({"error": "no data found for the given MYSQL_ID"}), 404
+    # Initialize the base filter with MYSQL_ID
+    filters = {"MYSQL_ID": MYSQLUser.id}
+
+    # Get query parameters
+    timestamp_str = request.args.get("timestamp")
+    userID = request.args.get("upload_id")
+    MYSQLID_str = request.args.get("MYSQL_ID")
+
+    # Check if at least one parameter is provided
+    if not timestamp_str and not userID and not MYSQLID_str:
+        return jsonify ({"error": "At least one parameter is required"}), 400
     
+    if timestamp_str and not userID and not MYSQLID_str:
+        return jsonify({"error": "timestamp must be paired with upload_id or MYSQL_ID"}), 400
+    # Add upload_id to the filter if provided
+    if userID:
+        try:
+            filters["upload_id"] = str(ObjectId(userID))  # Validate and use the provided upload_id
+        except Exception as e:
+            print("Error:", e)
+            return jsonify({"error": "Invalid upload_id format"}), 400
+
+    # Add timestamp to the filter if provided
+    if timestamp_str:
+        try:
+            # Remove the time zone offset (e.g., "+00:00") if present
+            if "+" in timestamp_str:
+                timestamp_str = timestamp_str.split("+")[0]
+
+            # Parse the timestamp string into a datetime object
+            target_timestamp = datetime.fromisoformat(timestamp_str)
+            filters["timestamp"] = target_timestamp
+        except Exception as e:
+            print("Error:", e)
+            return jsonify({"error": "Invalid timestamp format. Use ISO format (e.g., 2025-02-27T19:54:13.710)"}), 400
+
+    # Add MYSQL_ID to the filter if provided (override the base filter)
+    if MYSQLID_str:
+        try:
+            filters["MYSQL_ID"] = int(MYSQLID_str)  # Validate and use the provided MYSQL_ID
+        except Exception as e:
+            print("Error:", e)
+            return jsonify({"error": "Invalid MYSQL_ID format"}), 400
+
+    # Query the MongoDB collection with the combined filters
+    results = list(collection.find(filters, {"_id": 0}))
+
+    # Check if any results were found
+    if not results:
+        return jsonify({"error": "No data found for the given criteria"}), 404
+
+    # Convert results to a DataFrame for additional processing (if needed)
     df = pd.DataFrame(results)
-    if "Date" in df.columns and not df["Date"].isnull().all():  
+
+    # Convert the "Date" column to a string format if it exists
+    if "Date" in df.columns and not df["Date"].isnull().all():
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce").fillna("").astype(str)
 
-    print("Database name:", db.name)  
-    print("Collection name:", collection.name)  
+    # Debugging: Print database and collection names
+    print("Database name:", db.name)
+    print("Collection name:", collection.name)
 
+    # Return the results as JSON
     return jsonify(df.to_dict(orient="records")), 200
      
 #inputing data to a collection
@@ -61,6 +108,7 @@ def inputing_data(email):
         MYSQLUser = User.query.filter_by(email=email).first()
         if not MYSQLUser:
             return jsonify({"error": "user not found"}), 404
+            
 
         # Ensure a file is provided
         if "file" not in request.files:
@@ -162,7 +210,8 @@ def delete_data(email):
                 # Parse the timestamp string into a datetime object
                 target_timestamp = datetime.fromisoformat(timestamp_str)
                 filters["timestamp"] = target_timestamp
-            except ValueError:
+            except Exception as e:
+                print("Error:", e)
                 return jsonify({"error": "Invalid timestamp format. Use ISO format (e.g., 2025-02-27T19:54:13.710)"}), 400
 
         # Delete documents matching the filter
@@ -174,10 +223,10 @@ def delete_data(email):
                 {"MYSQL_ID": MYSQLUser.id},
                 {"$inc": {"upload_count": -1}}
             )
-            if userID or timestamp_str:
+            if userID and timestamp_str:
                 user_uploads.update_one(
                     {"MYSQL_ID": MYSQLUser.id, "upload_id": userID},
-                    {"$set": {"status": False}}
+                    {"$set": {"status": False}},
                 )
 
         # Check if any documents were deleted
